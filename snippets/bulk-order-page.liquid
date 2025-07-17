@@ -1,0 +1,104 @@
+<script src="{{ 'bulk-order.js' | asset_url }}" defer></script>
+
+<link rel="stylesheet" href="{{ 'bulk-order.css' | asset_url }}"> 
+
+<div id="bulk-order-app" style="margin: auto; font-family: sans-serif;">
+  <input
+    type="text"
+    id="search-input"
+    placeholder="Search products..."
+    style="margin-bottom: 1rem; padding: 10px; width: 100%; border: 1px solid #ccc; border-radius: 6px;"
+  />
+
+  <div id="loading" style="display: none; margin: 1rem 0; text-align: center;">
+    <div class="loader-container">
+      <div class="spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 36px; height: 36px; animation: spin 1s linear infinite; margin: auto;"></div>
+      <div class="loading-text" style="margin-top: 8px; font-weight: bold;">Loading products...</div>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 24px;">
+    <div id="products-table" style="flex: 2 2 600px; position: relative;"></div>
+
+    <div
+      id="cart-summary"
+      style="
+        flex: 1 1 280px;
+        border: 1px solid #ddd;
+        padding: 16px;
+        border-radius: 8px;
+        background: #fafafa;
+        height: fit-content;
+        min-width: 280px;
+      "
+    >
+      <h3 style="margin-bottom: 1rem;">Cart Summary</h3>
+      <div id="cart-items" style="font-size: 14px;"></div>
+
+      <div id="loading_cart" style="display: none; margin: 1rem 0; text-align: center;">
+    
+      <div class="spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 36px; height: 36px; animation: spin 1s linear infinite; margin: auto;"></div>
+      
+    </div>
+ 
+      
+      <hr style="margin: 1rem 0" />
+      <div id="cart-subtotal"></div>
+      <a
+        href="/cart"
+        id="proceed-cart-btn"
+        style="
+          display: block;
+          margin-top: 20px;
+          text-align: center;
+          background: #000;
+          color: #fff;
+          padding: 12px;
+          border-radius: 6px;
+          text-decoration: none;
+        "
+        >Proceed to Cart</a
+      >
+        <div
+    id="toast"
+    style="
+      position: fixed;
+      bottom: 10%;
+      right: 20px;
+      min-width: 240px;
+      z-index: 9999;
+    "
+  ></div>
+    </div>
+  </div>
+
+
+
+  <div
+    id="load-more-container"
+    style="margin: 1.5rem 0; text-align: center; display: none;"
+  >
+    <button
+      id="load-more"
+      style="
+        padding: 10px 24px;
+        background: #f0f0f0;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        cursor: pointer;
+      "
+    >
+      Load More Products
+    </button>
+  
+    <div
+      id="load-more-spinner"
+      style="margin-top: 10px; display: none;"
+    >
+      <div
+        style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: auto;"
+      ></div>
+    </div>
+  </div>
+
+</div>
