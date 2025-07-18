@@ -1,4 +1,9 @@
   document.addEventListener("DOMContentLoaded", function () {
+
+    window.storeCredits = {{ customer.store_credit_account.balance | default: 0 | money_without_currency | remove: ',' }};
+  window.storeCurrency = "{{ shop.currency }}";
+
+    
     const EXCLUDED_TAGS = ["pharmacist-only","wegovy"];
     const PRODUCTS_PER_PAGE = 250;
     const UI_BATCH_SIZE = 20;
@@ -57,7 +62,7 @@
           );
 
           allProducts = allProducts.concat(filteredBatch);
-          //break; // stop after 1 page only
+          //break; // ✅ stop after 1 page only
 
            if (data.products.length < PRODUCTS_PER_PAGE) break;
            currentPage++;
@@ -156,6 +161,7 @@
     
           if (data.products.length < PRODUCTS_PER_PAGE) break;
           page++;
+          //console.log('page: '+page);
         } catch (err) {
           console.error("Error in background product loading (page", page, "):", err);
           break;
@@ -183,6 +189,7 @@
         return 1; // b is available, a is not → b first
       });
 
+      // Table HTML for desktop
       let html = `
         <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
           <thead>
@@ -197,6 +204,9 @@
           <tbody>
       `;
 
+      // Cards HTML for mobile
+      let cardsHTML = `<div class="mobile-product-cards" style="display: flex; flex-direction: column; gap: 16px;">`;
+
       for (const product of products) {
         const variant = product.variants?.[0];
         const available = variant?.available;
@@ -208,6 +218,7 @@
         // If no variants, disable qty & add button
         const disableControls = !variant;
 
+        // For table
        html += `
         <tr data-variant-id="${variant?.id || ""}" data-title="${product.title}" data-price="${variant?.price || 0}">
           <td style="padding: 10px;">
@@ -226,7 +237,7 @@
                 : `
               <div style="display: flex; justify-content: center; align-items: center; gap: 4px;">
                 <button class="qty-minus" style="width: 30px; height: 30px;">-</button>
-                <input type="number" min="0" value="0" class="qty" style="width: 50px; text-align: center;" />
+                <input type="number" min="0" value="" placeholder="0" class="qty" style="width: 50px; text-align: center;" />
                 <button class="qty-plus" style="width: 30px; height: 30px;">+</button>
               </div>
               `
@@ -241,11 +252,47 @@
           </td>
         </tr>
       `;
+
+      // For mobile cards
+      cardsHTML += `
+        <div class="product-card" data-variant-id="${variant?.id || ""}" data-title="${product.title}" data-price="${variant?.price || 0}" style="border: 1px solid #ddd; border-radius: 8px; padding: 12px; background: #fff;">
+          <div style="display: flex; gap: 12px; align-items: center;">
+            <div style="flex-shrink: 0;">
+              ${
+                image
+                  ? `<img src="${image}" alt="${product.title}" style="width: 80px; height: auto; border-radius: 4px;" />`
+                  : `<span style="color: #888;">No Image</span>`
+              }
+            </div>
+            <div style="flex-grow: 1;">
+              <h4 style="margin: 0 0 6px 0;">${product.title}</h4>
+              <div style="font-weight: bold; margin-bottom: 8px;">${price}</div>
+              ${
+                isSoldOut
+                  ? `<div style="color: red; font-weight: bold;">Sold Out</div>`
+                  : `
+                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+                  <button class="qty-minus" style="width: 28px; height: 28px;">-</button>
+                  <input type="number" min="0" value="" placeholder="0" class="qty" style="width: 48px; text-align: center; border: 1px solid #ccc; border-radius: 4px;" />
+                  <button class="qty-plus" style="width: 28px; height: 28px;">+</button>
+                </div>
+                `
+              }
+              <button class="add-to-cart" style="padding: 8px 20px; background: #ee2737; color: white; border: none; border-radius: 6px; cursor: pointer; width: 100%;">Add</button>
+            </div>
+          </div>
+        </div>
+      `;
       }
 
       html += "</tbody></table>";
+      cardsHTML += "</div>";
 
-      productsTable.innerHTML = html;
+      // Inject both, and use CSS to show/hide based on screen size
+      productsTable.innerHTML = `
+        <div class="desktop-product-table">${html}</div>
+        <div class="mobile-product-cards-container">${cardsHTML}</div>
+      `;
 
       attachEvents();
     }
@@ -276,7 +323,7 @@
 
       document.querySelectorAll(".add-to-cart").forEach((btn) => {
         btn.onclick = async () => {
-          const row = btn.closest("tr");
+          const row = btn.closest("tr") || btn.closest(".product-card");
           const variantId = row.getAttribute("data-variant-id");
           const title = row.getAttribute("data-title");
           const price = parseInt(row.getAttribute("data-price"));
@@ -292,10 +339,23 @@
             return;
           }
 
+          // 🔄 Add spinner to button
+          const originalBtnText = btn.innerHTML;
+          btn.innerHTML = `<span class="spinner" style="
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            margin:0;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+          "></span>`;
+          btn.disabled = true;
           loadingCart.style.display = "block";
 
           try {
-            console.log("Adding to cart:", { variantId, qty });
+            //console.log("Adding to cart:", { variantId, qty });
           
             const response = await fetch("/cart/add.js", {
               method: "POST",
@@ -317,6 +377,13 @@
               showToast(`${title} added to cart!`, "success");
               qtyInput.value = 0;
               userIsInteracting = false;
+              // ✅ Scroll to cart summary after add
+              // const cartSection = document.getElementById("cart-summary");
+              // const header = document.getElementById("shopify-section-header");
+              // const headerHeight = header ? header.offsetHeight : 0;
+              // const cartTop = cartSection.getBoundingClientRect().top + window.scrollY - headerHeight;
+              // window.scrollTo({ top: cartTop, behavior: "smooth" });
+              btn.innerText = "Added!";
             } catch (err) {
               console.error("updateCartSummary error:", err);
               showToast("Cart updated, but summary failed.", "error");
@@ -327,6 +394,12 @@
             showToast("Failed to add to cart. Please try again.", "error");
           } finally {
             loadingCart.style.display = "none";
+
+          // Reset button after delay
+          setTimeout(() => {
+            btn.innerText = originalBtnText;
+            btn.disabled = false;
+          }, 2000);
           }
         };
       });
@@ -344,14 +417,14 @@
       if (existing) {
         existing.qty += qty;
       } else {
-        const imgEl = document.querySelector(`tr[data-variant-id="${variantId}"] img`);
+        const imgEl = document.querySelector(`tr[data-variant-id="${variantId}"] img`) ||  document.querySelector(`.product-card[data-variant-id="${variantId}"] img`);
         const image = imgEl ? imgEl.src : "";
         localCart.push({ variantId, title, price, qty, image });
       }
       renderCartSummary();
     }
 
-    async function updateShopifyCart(variantId, newQty) {
+    async function updateShopifyCart(variantId, newQty, oldqty) {
       console.log("Updating cart:", { variantId, newQty });
       try {
         const cartRes = await fetch("/cart.js");
@@ -361,13 +434,13 @@
     
         const item = cart.items.find((i) => i.variant_id == variantId);
         if (!item) {
-          console.error(" Line item not found for variant ID:", variantId);
+          console.error("❌ Line item not found for variant ID:", variantId);
           return;
         }
 
         const ititle = item.title;
     
-        console.log(" Updating line item:", {
+        console.log("🛒 Updating line item:", {
           variantId,
           key: item.key,
           quantity: newQty,
@@ -380,27 +453,39 @@
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            id: item.key,        //  Shopify expects the `line_item.key` here
-            quantity: newQty,    //  Must be integer >= 0
+            id: item.key,        // 🔥 Shopify expects the `line_item.key` here
+            quantity: newQty,    // ✅ Must be integer >= 0
           }),
         });
     
         const result = await changeRes.json();
     
         if (!changeRes.ok) {
-          console.error(" Shopify /cart/change.js failed:", result);
-          showToast("Update failed", "error");
+          console.error("❌ Shopify /cart/change.js failed:", result);
+    
+          // Extract stock limit from error message
+          let availableQtyMessage = `Requested quantity not available for "${ititle}".`;
+          const match = result?.description?.match(/maximum.*?(\d+)/i);
+          if (match && match[1]) {
+            availableQtyMessage = `Only ${match[1]} of "${ititle}" available in stock.`;
+          }
+    
+          showToast(availableQtyMessage, "error");
+          loadingCart.style.display = "none";
+          await syncCartWithShopify(ititle); // pass title here
           throw new Error("Update failed");
         }
 
         loadingCart.style.display = "none";
         showToast("Cart updated successfully");
     
-        console.log(" Cart updated successfully:", result);
+        console.log("✅ Cart updated successfully:", result);
       } catch (err) {
         
           showToast("Cart Update failed", "error");
-        console.error(" Cart change error:", err);
+        console.error("💥 Cart change error:", err);
+        loadingCart.style.display = "none";
+        syncCartWithShopify();
       }
     }
 
@@ -436,7 +521,7 @@
       }
     }
 
-    async function syncCartWithShopify() {
+    async function syncCartWithShopify(productTitle = "") {
       try {
         const res = await fetch("/cart.js");
         const data = await res.json();
@@ -451,7 +536,11 @@
     
         renderCartSummary();
       } catch (err) {
-        console.error("Failed to fetch Shopify cart:", err);
+        console.error("Failed to fetch Shopify cart:", err);const fallbackMsg = productTitle
+      ? `Couldn't update cart for "${productTitle}". Please refresh the page.`
+      : `Failed to sync cart. Please refresh.`;
+
+    showToast(fallbackMsg, "error");
       }
     }
 
@@ -463,8 +552,8 @@
 
       localCart.forEach((item, idx) => {
 
-        console.log('item ' +item.title);
-        console.log('price ' +item.price);
+        //console.log('item ' +item.title);
+        //console.log('price ' +item.price);
         const lineTotal = item.qty * item.price;
         const lineprice = item.price;
         subtotal += lineTotal;
@@ -495,6 +584,7 @@
         minusBtn.style.cssText = "width: 24px; height: 24px; cursor: pointer;";
         minusBtn.onclick = async () => {
           if (item.qty > 1) {
+            const oldqty = item.qty
             item.qty--;
             await updateShopifyCart(item.variantId, item.qty);
             renderCartSummary();
@@ -514,8 +604,9 @@
         plusBtn.textContent = "+";
         plusBtn.style.cssText = "width: 24px; height: 24px; cursor: pointer;";
         plusBtn.onclick = async () => {
+          const oldqty = item.qty
           item.qty++;
-          await updateShopifyCart(item.variantId, item.qty);
+          await updateShopifyCart(item.variantId, item.qty, oldqty);
           renderCartSummary();
         };
 
@@ -554,10 +645,32 @@
         </div>
         <div style="display: flex; justify-content: space-between;">
           <span><strong>Subtotal:</strong></span>
-          <span>${subtotal.toFixed(2)}</span>
+          <span>$${subtotal.toFixed(2)}</span>
         </div>
       `;
+
+        // Show store credits info
+        const creditsContainer = document.getElementById("store-credits");
+        if (window.storeCredits !== undefined) {
+          const credits = parseFloat(window.storeCredits);
+          const remaining = credits - subtotal;
+          const currency = window.storeCurrency || "$";
+      
+          creditsContainer.innerHTML = `
+            <div style="display: flex; justify-content: space-between; margin-top: 8px;">
+              <span><strong>Store Credits Available:</strong></span>
+              <span>${currency}${credits.toFixed(2)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 4px; color: ${remaining < 0 ? "red" : "green"};">
+              <span><strong>Remaining Credits after Purchase:</strong></span>
+              <span>${currency}${remaining.toFixed(2)}</span>
+            </div>
+          `;
+        }
     }
+
+
+
 
     // Show toast notifications
     function showToast(message, type = "success") {
