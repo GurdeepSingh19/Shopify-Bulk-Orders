@@ -59,5 +59,3 @@ You can test locally by using Shopify theme custom page and uploading the HTML/C
 
 Shopify doesn’t support server-side pagination, so we fetch and filter using /products.json with limit and page
 
-## 📬 Questions?
-For help or suggestions, reach out to [Your Name or Team].
